@@ -2,17 +2,19 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import $ from 'jquery';
 import axios from 'axios';
-import List from './components/List.jsx';
+import EventList from './components/EventList.jsx';
+import Search from './components/Search.jsx';
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = { 
-      items: []
+      events: []
     }
 
     this.getTicketInfo = this.getTicketInfo.bind(this);
-
+    this.searchEvent = this.searchEvent.bind(this);
+    this.deleteEvent = this.deleteEvent.bind(this);
   }
 
   componentDidMount() {
@@ -20,15 +22,40 @@ class App extends React.Component {
   }
 
   getTicketInfo() {
-    axios.get('/tickets')
-    .then((data) => console.log(data.data.listing.map((listing) => {return listing.listingPrice})))
+    axios.get('/events')
+    .then((data) => {this.setState({
+      events : data.data
+    })})
+  }
+
+  searchEvent(eventid) {
+    axios.post('/events', {
+      params: {
+        eventid : eventid
+      }
+    })
+    .then(() => {
+      this.getTicketInfo()})
+  }
+
+  deleteEvent(eventid) {
+    axios.delete('/events', {
+      params: {
+        eventid : eventid
+      }
+    })
+    .then(() => {
+      this.getTicketInfo()})
   }
 
 
   render () {
     return (<div>
-      <h1>Item List</h1>
-      <List items={this.state.items}/>
+      <h1>Get the latest ticket prices!</h1>
+      <Search searchEvent={this.searchEvent}/>
+      <EventList 
+      deleteEvent={this.deleteEvent}
+      events={this.state.events}/>
     </div>)
   }
 }

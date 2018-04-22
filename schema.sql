@@ -7,7 +7,10 @@ CREATE DATABASE stubhub;
 DROP TABLE IF EXISTS events;
 
 CREATE TABLE events (
-  eventid INT NOT NULL UNIQUE
+  eventid INT NOT NULL UNIQUE,
+  name VARCHAR (250),
+  location VARCHAR (50),
+  date date
   -- quantity integer NOT NULL,
   -- description varchar(50) NOT NULL,
 );

@@ -1,10 +1,12 @@
-var express = require('express');
-var bodyParser = require('body-parser');
+const express = require('express');
+const bodyParser = require('body-parser');
 const axios = require('axios');
 // UNCOMMENT THE DATABASE YOU'D LIKE TO USE
 // var items = require('../database-mysql');
 // var items = require('../database-mongo');
-const {selectAll} = require('../database-postgresql');
+const moment = require('moment');
+const Promise = require('bluebird');
+const {selectAll, insertEvent, deleteEvent} = require('../database-postgresql');
 
 
 var app = express();
@@ -14,9 +16,12 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
-// 103499951
 
 app.get('/tickets', function (req, res) {
+  selectAll()
+  // .then((data) => {return data.rows})
+  // .then((eventid) => con)
+  
   // const options = {
   //   method: 'GET',
   //   headers: {'Authorization': 'Bearer 0261b6a2-61f8-3fda-a6e1-8c9c88220277',
@@ -357,15 +362,110 @@ res.json(file);
 
 })
 
+app.post('/events', function(req, res) {
+  const eventid = req.body.params.eventid;
+  const options = {
+    method: 'GET',
+    headers: {'Authorization': 'Bearer 0261b6a2-61f8-3fda-a6e1-8c9c88220277',
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'},
+    url: 'https://api.stubhub.com/catalog/events/v3/' + eventid
+  }
+  axios(options)
+  .then((data) => {
+    const name = data.data.name;
+    const location = data.data.geography.name;
+    const date = moment(data.data.eventDateLocal).format('YYYY-MM-DD');
+    insertEvent(eventid, name, location, date)
+    .then((data) => res.sendStatus(201));
+  })
+  .catch((err) => console.error(err))
+})
 
-app.get('/events', function (req, res) {
-  selectAll()
-  .then((data) => res.json(data));
+
+app.delete('/events', function(req, res) {
+  const eventid = req.query.eventid;
+  deleteEvent(eventid)
+  .then((data) => res.sendStatus(201));
 })
 
 
 
-app.listen(3000, function() {
+app.get('/events', function (req, res) {
+  selectAll()
+  .then((data) => {
+    let promises = [];
+    data.rows.forEach((event) => {
+      const options = {
+            method: 'GET',
+            headers: {'Authorization': 'Bearer 0261b6a2-61f8-3fda-a6e1-8c9c88220277',
+            'Accept': 'application/json',
+            'Accept-Encoding': 'application/json'},
+            params: { eventid: event.eventid,
+              rows: 3},
+            url: 'https://api.stubhub.com/search/inventory/v2'
+            }
+      promises.push(Promise.resolve(
+        axios(options)
+        .then((data) => {
+          let allListing = data.data.listing.map((listing) => {
+            return {price : listing.listingPrice.amount,
+            quantity : listing.quantity}  
+          })
+          event.listing = allListing;
+        })
+        .catch((err) => {
+          let noInventory= [
+            {
+                "price": 0,
+                "quantity": 0
+            },
+            {
+                "price": 0,
+                "quantity": 0
+            },
+            {
+                "price": 0,
+                "quantity": 0
+            }
+        ]
+          event.listing = noInventory;
+        })
+      ))
+    })
+    Promise.all(promises)
+    .then(() => res.json(data.rows));
+  })
+
+
+
+
+  // selectAll()
+  // .then((data) => {return data.rows.map((eventid) => {return eventid.eventid})})
+  // .then((eventids) => {
+  //   return Promise.all(eventids.map((eventid) => {
+  //     const options = {
+  //     method: 'GET',
+  //     headers: {'Authorization': 'Bearer 0261b6a2-61f8-3fda-a6e1-8c9c88220277',
+  //     'Accept': 'application/json',
+  //     'Accept-Encoding': 'application/json'},
+  //     params: { eventid: eventid,
+  //       rows: 3},
+  //     url: 'https://api.stubhub.com/search/inventory/v2'
+  //     }
+  //     return axios(options)
+  //     .then((data) => {return data.data})
+  //     .catch((err) => console.error(err));
+  //   }))
+  // .then((data) => res.json(data))
+  // })
+})
+
+
+let port = process.env.PORT || 3000;
+
+
+app.listen(port, function() {
   console.log('listening on port 3000!');
 });
 
